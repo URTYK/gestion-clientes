@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Compras y Comisiones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header, main, footer {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1, h2 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        section {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        li {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .editable {
+            cursor: pointer;
+        }
+
+        .edit-input {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            form {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Control de Compras y Comisiones</h1>
+    </header>
+
+    <main>
+        <section id="clients-section">
+            <h2>Clientes</h2>
+            <form id="client-form">
+                <input type="text" id="client-name" placeholder="Nombre del cliente" required>
+                <button type="submit">Agregar Cliente</button>
+            </form>
+            <ul id="clients-list"></ul>
+        </section>
+
+        <section id="products-section">
+            <h2>Productos</h2>
+            <form id="product-form">
+                <input type="text" id="product-name" placeholder="Nombre del producto" required>
+                <input type="number" id="product-price" placeholder="Precio del producto (EUR)" step="0.01" min="0" required>
+                <button type="submit">Agregar Producto</button>
+            </form>
+            <ul id="products-list"></ul>
+        </section>
+
+        <section id="sales-section">
+            <h2>Registro de Compras</h2>
+            <form id="sales-form">
+                <select id="select-client" required>
+                    <option value="">Seleccione un cliente</option>
+                </select>
+                <select id="select-product" required>
+                    <option value="">Seleccione un producto</option>
+                </select>
+                <input type="number" id="product-quantity" placeholder="Cantidad" min="1" required>
+                <button type="submit">Registrar Compra</button>
+            </form>
+            <ul id="sales-list"></ul>
+        </section>
+
+        <section id="report-section">
+            <h2>Reportes</h2>
+            <button id="daily-report">Reporte Diario</button>
+            <button id="weekly-report">Reporte Semanal</button>
+            <button id="monthly-report">Reporte Mensual</button>
+            <ul id="report-list"></ul>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 - Control de Compras</p>
+    </footer>
+
+    <script>
+        // Variables para almacenar datos
+        let clients = [];
+        let products = [];
+        let sales = [];
+
+        // Funciones de utilidad
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
+
+        // Función para agregar cliente
+        function addClient(e) {
+            e.preventDefault();
+            const clientName = $('#client-name').value.trim();
+            if (clientName && !clients.includes(clientName)) {
+                clients.push(clientName);
+                $('#client-name').value = '';
+                updateClientList();
+                updateClientSelect();
+            }
+        }
+
+        // Función para agregar producto
+        function addProduct(e) {
+            e.preventDefault();
+            const productName = $('#product-name').value.trim();
+            const productPrice = parseFloat($('#product-price').value);
+            if (productName && !isNaN(productPrice)) {
+                products.push({ name: productName, price: productPrice });
+                $('#product-name').value = '';
+                $('#product-price').value = '';
+                updateProductList();
+                updateProductSelect();
+            }
+        }
+
+        // Función para editar productos
+        function editProduct(index) {
+            const product = products[index];
+            const li = $(`#product-${index}`);
+            li.innerHTML = `
+                <input type="text" value="${product.name}" class="edit-product-name">
+                <input type="number" value="${product.price}" step="0.01" min="0" class="edit-product-price">
+                <button class="save-edit">Guardar</button>
+            `;
+            li.querySelector('.save-edit').addEventListener('click', () => saveProductEdit(index));
+        }
+
+        // Función para guardar edición de producto
+        function saveProductEdit(index) {
+            const li = $(`#product-${index}`);
+            const newName = li.querySelector('.edit-product-name').value.trim();
+            const newPrice = parseFloat(li.querySelector('.edit-product-price').value);
+            if (newName && !isNaN(newPrice)) {
+                products[index] = { name: newName, price: newPrice };
+                updateProductList();
+                updateProductSelect();
+            }
+        }
+
+        // Actualiza la lista de clientes
+        function updateClientList() {
+            const clientList = $('#clients-list');
+            clientList.innerHTML = clients.map(client => `<li>${client}</li>`).join('');
+        }
+
+        // Actualiza la lista de productos
+        function updateProductList() {
+            const productList = $('#products-list');
+            productList.innerHTML = products.map((product, index) => `
+                <li id="product-${index}">
+                    ${product.name} - €${product.price.toFixed(2)}
+                    <button onclick="editProduct(${index})">Editar</button>
+                </li>
+            `).join('');
+        }
+
+        // Actualiza el selector de clientes
+        function updateClientSelect() {
+            const clientSelect = $('#select-client');
+            clientSelect.innerHTML = '<option value="">Seleccione un cliente</option>' +
+                clients.map(client => `<option value="${client}">${client}</option>`).join('');
+        }
+
+        // Actualiza el selector de productos
+        function updateProductSelect() {
+            const productSelect = $('#select-product');
+            productSelect.innerHTML = '<option value="">Seleccione un producto</option>' +
+                products.map(product => `<option value="${product.name}">${product.name} - €${product.price.toFixed(2)}</option>`).join('');
+        }
+
+        // Función para registrar una compra
+        function registerPurchase(e) {
+            e.preventDefault();
+            const client = $('#select-client').value;
+            const productName = $('#select-product').value;
+            const quantity = parseInt($('#product-quantity').value);
+
+            if (client && productName && !isNaN(quantity) && quantity > 0) {
+                const product = products.find(p => p.name === productName);
+                const total = product.price * quantity;
+                const sale = { client, product: productName, quantity, total, date: new Date() };
+                sales.push(sale);
+                $('#product-quantity').value = '';
+                updateSalesList();
+            }
+        }
+
+        // Actualiza la lista de ventas
+        function updateSalesList() {
+            const salesList = $('#sales-list');
+            const client = $('#select-client').value;
+            const filteredSales = client ? sales.filter(sale => sale.client === client) : sales;
+            salesList.innerHTML = filteredSales.map(sale => `
+                <li>
+                    Fecha: ${sale.date.toLocaleDateString()}, 
+                    Cliente: ${sale.client}, 
+                    Producto: ${sale.product}, 
+                    Cantidad: ${sale.quantity}, 
+                    Total: €${sale.total.toFixed(2)}
+                </li>
+            `).join('');
+        }
+
+        // Función para calcular comisiones
+        function calculateCommission(total) {
+            return total * 0.05;
+        }
+
+        // Generar reporte
+        function generateReport(period) {
+            const reportList = $('#report-list');
+            let filteredSales;
+            const now = new Date();
+
+            switch (period) {
+                case 'daily':
+                    filteredSales = sales.filter(sale => sale.date.toDateString() === now.toDateString());
+                    break;
+                case 'weekly':
+                    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    filteredSales = sales.filter(sale => sale.date > oneWeekAgo);
+                    break;
+                case 'monthly':
+                    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                    filteredSales = sales.filter(sale => sale.date > oneMonthAgo);
+                    break;
+            }
+
+            const totalSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+            const commission = calculateCommission(totalSales);
+
+            reportList.innerHTML = `
+                <li>
+                    Ventas ${period === 'daily' ? 'diarias' : period === 'weekly' ? 'semanales' : 'mensuales'}: 
+                    €${totalSales.toFixed(2)}, 
+                    Comisión: €${commission.toFixed(2)}
+                </li>
+            `;
+        }
+
+        // Event Listeners
+        $('#client-form').addEventListener('submit', addClient);
+        $('#product-form').addEventListener('submit', addProduct);
+        $('#sales-form').addEventListener('submit', registerPurchase);
+        $('#select-client').addEventListener('change', updateSalesList);
+        $('#daily-report').addEventListener('click', () => generateReport('daily'));
+        $('#weekly-report').addEventListener('click', () => generateReport('weekly'));
+        $('#monthly-report').addEventListener('click', () => generateReport('monthly'));
+
+        // Inicialización
+        updateClientList();
+        updateProductList();
+        updateClientSelect();
+        updateProductSelect();
+    </script>
+</body>
+</html>
